@@ -1,4 +1,4 @@
-package fileparser
+package fileaddrhandler
 
 import (
 	"bytes"
@@ -71,11 +71,11 @@ func (p *Parser) writeSupportFile(src io.Reader, target io.Writer) (FileType, er
 	for k := range p.supportFileTypeMap {
 		if k.Is(rawHeadHex) {
 			ft = k
-			goto StartWrite
+			goto StartCopy
 		}
 	}
 	return "", ErrCodeUnsupportedFileType.Error("不支持当前原始的文件类型")
-StartWrite:
+StartCopy:
 	if _, err = target.Write(buf); err != nil {
 		return "", ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "向目标文件写出内容失败: %s", err)
 	}
@@ -146,8 +146,8 @@ func (p *Parser) fileProtoWrite(uri string, w io.Writer) (FileType, error) {
 	return p.writeSupportFile(f, w)
 }
 
-// WriteTo 写到io.Writer
-func (p *Parser) WriteTo(uri string, w io.Writer) (FileType, error) {
+// CopyTo 拷贝到io.Writer
+func (p *Parser) CopyTo(uri string, w io.Writer) (FileType, error) {
 	if len(p.supportFileTypeMap) == 0 {
 		return "", ErrCodeNoSupportFileTypes.Error("没有配置支持的文件类型")
 	}
@@ -174,8 +174,8 @@ func (p *Parser) WriteTo(uri string, w io.Writer) (FileType, error) {
 
 }
 
-// WriteToPath 写到路径
-func (p *Parser) WriteToPath(uri, targetPath string) (FileType, error) {
+// CopyToPath 写到路径
+func (p *Parser) CopyToPath(uri, targetPath string) (FileType, error) {
 	dir := filepath.Dir(targetPath)
 	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
 		if err = os.MkdirAll(dir, 0755); err != nil {
@@ -189,5 +189,5 @@ func (p *Parser) WriteToPath(uri, targetPath string) (FileType, error) {
 	}
 	defer f.Close()
 
-	return p.WriteTo(uri, f)
+	return p.CopyTo(uri, f)
 }

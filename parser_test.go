@@ -1,4 +1,4 @@
-package fileparser
+package fileaddrhandler
 
 import (
 	"encoding/base64"
@@ -56,12 +56,12 @@ func TestParser_FileProtoWrite(t *testing.T) {
 
 	parser := New(FileTypePDF)
 
-	_, err := parser.WriteTo("file://"+targetFile, os.Stdout)
+	_, err := parser.CopyTo("file://"+targetFile, os.Stdout)
 	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
 		return
 	}
 
-	ft, err := parser.WriteToPath("file://"+srcFile, targetFile)
+	ft, err := parser.CopyToPath("file://"+srcFile, targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -108,17 +108,17 @@ func TestParser_HttpProtoWrite(t *testing.T) {
 	httpsSrcUri := httpsServer.URL
 
 	parser := New(FileTypePDF)
-	_, err = parser.WriteTo(httpSrcUri+"/"+targetFile, os.Stdout)
+	_, err = parser.CopyTo(httpSrcUri+"/"+targetFile, os.Stdout)
 	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
 		return
 	}
 
-	_, err = parser.WriteTo(httpsSrcUri+"/"+targetFile, os.Stdout)
+	_, err = parser.CopyTo(httpsSrcUri+"/"+targetFile, os.Stdout)
 	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
 		return
 	}
 
-	ft, err := parser.WriteToPath(httpSrcUri+"/"+srcFile, targetFile)
+	ft, err := parser.CopyToPath(httpSrcUri+"/"+srcFile, targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -140,7 +140,7 @@ func TestParser_HttpProtoWrite(t *testing.T) {
 		return
 	}
 
-	ft, err = parser.WriteToPath(httpsSrcUri+"/"+srcFile, targetFile)
+	ft, err = parser.CopyToPath(httpsSrcUri+"/"+srcFile, targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -177,7 +177,7 @@ func TestParser_MimeProtoWrite(t *testing.T) {
 	mimeStr := "data:application/pdf;base64," + fb64
 
 	parser := New(FileTypePDF)
-	ft, err := parser.WriteToPath(mimeStr, targetFile)
+	ft, err := parser.CopyToPath(mimeStr, targetFile)
 	if !a.NoError(err) {
 		return
 	}

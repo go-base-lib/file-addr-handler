@@ -1,4 +1,4 @@
-package fileparser
+package fileaddrhandler
 
 import (
 	"encoding/hex"

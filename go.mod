@@ -1,4 +1,4 @@
-module github.com/byzk-worker/file-parser
+module github.com/byzk-worker/file-addr-handler
 
 go 1.18
 
