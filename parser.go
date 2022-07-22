@@ -172,6 +172,9 @@ func (p *Parser) CopyTo(uri string, w io.Writer) (FileType, error) {
 	case "https":
 		return p.httpProtoWrite(uri, w)
 	case "file":
+		if strings.HasPrefix(uri, "file:///") {
+			uri = uri[:7] + uri[8:]
+		}
 		return p.fileProtoWrite(uri, w)
 	default:
 		return "", ErrCodeUnsupportedProtocols.Error("暂不支持该协议类型")

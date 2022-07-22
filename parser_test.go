@@ -216,7 +216,7 @@ func TestChineseFile(t *testing.T) {
 		return
 	}
 
-	encUri := url.QueryEscape("file://" + pdfSrcFile)
+	encUri := url.QueryEscape("file:///" + pdfSrcFile)
 
 	ft, err := parser.CopyToPath(encUri, targetFile)
 	if !a.NoError(err) {
