@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 )
@@ -14,6 +15,8 @@ import (
 var (
 	srcFile    = "test.pdf"
 	targetFile = "test_copy.pdf"
+
+	chineseSrcFile = "中文测试.pdf"
 )
 
 var testHttpHandFunc http.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
@@ -197,4 +200,52 @@ func TestParser_MimeProtoWrite(t *testing.T) {
 	}
 
 	a.Equal(srcBytes, targetBytes)
+}
+
+func TestChineseFile(t *testing.T) {
+	a := assert.New(t)
+
+	defer os.RemoveAll(targetFile)
+
+	pdfSrcFile := chineseSrcFile
+
+	parser := New(FileTypePDF)
+
+	_, err := parser.CopyTo("file://"+targetFile, os.Stdout)
+	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
+		return
+	}
+
+	encUri := url.QueryEscape("file://" + pdfSrcFile)
+
+	ft, err := parser.CopyToPath(encUri, targetFile)
+	if !a.NoError(err) {
+		return
+	}
+
+	if !a.Equal(ft, FileTypePDF) {
+		return
+	}
+
+	stat, err := os.Stat(targetFile)
+	if !a.NoError(err) {
+		return
+	}
+
+	if !a.False(stat.IsDir()) {
+		return
+	}
+
+	srcBytes, err := ioutil.ReadFile(pdfSrcFile)
+	if !a.NoError(err) {
+		return
+	}
+
+	targetBytes, err := ioutil.ReadFile(targetFile)
+	if !a.NoError(err) {
+		return
+	}
+
+	a.Equal(srcBytes, targetBytes)
+
 }

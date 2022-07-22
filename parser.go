@@ -148,6 +148,7 @@ func (p *Parser) fileProtoWrite(uri string, w io.Writer) (FileType, error) {
 
 // CopyTo 拷贝到io.Writer
 func (p *Parser) CopyTo(uri string, w io.Writer) (FileType, error) {
+	var err error
 	if len(p.supportFileTypeMap) == 0 {
 		return "", ErrCodeNoSupportFileTypes.Error("没有配置支持的文件类型")
 	}
@@ -156,6 +157,10 @@ func (p *Parser) CopyTo(uri string, w io.Writer) (FileType, error) {
 		return p.mimeFileWrite(uri, w)
 	}
 
+	uri, err = url.QueryUnescape(uri)
+	if err != nil {
+		return "", ErrCodeUnsupportedProtocols.Error("解析url编码失败: " + err.Error())
+	}
 	u, err := url.Parse(uri)
 	if err != nil {
 		return "", ErrCodeUnsupportedProtocols.ErrorWithRawErrf(err, "不支持的协议类型: %s", err.Error())
