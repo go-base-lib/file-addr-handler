@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
+
+const isWindows = runtime.GOOS == "windows"
 
 var httpsSupportClient = &http.Client{Transport: &http.Transport{
 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -20,6 +22,13 @@ var httpsSupportClient = &http.Client{Transport: &http.Transport{
 var (
 	// mimeTypeJudgeReg MIME类型判断正则
 	mimeTypeJudgeReg = regexp.MustCompile("^data:([a-z]+)/([a-z]+);base64,([\\da-zA-Z+=/]+)$")
+)
+
+type CodeFlag byte
+
+const (
+	CodeFlagB64 CodeFlag = iota
+	CodeFlagHex
 )
 
 // Parser 解析器
@@ -146,56 +155,66 @@ func (p *Parser) fileProtoWrite(uri string, w io.Writer) (FileType, error) {
 	return p.writeSupportFile(f, w)
 }
 
-// CopyTo 拷贝到io.Writer
-func (p *Parser) CopyTo(uri string, w io.Writer) (FileType, error) {
-	var err error
-	if len(p.supportFileTypeMap) == 0 {
-		return "", ErrCodeNoSupportFileTypes.Error("没有配置支持的文件类型")
+// Copy 拷贝文件流
+func (p *Parser) Copy(reader io.Reader, writer io.Writer) (FileType, error) {
+	if reader == nil {
+		return "", ErrCodeEmptyStream.Error("读取流不能为空")
 	}
 
-	if mimeTypeJudgeReg.MatchString(uri) {
-		return p.mimeFileWrite(uri, w)
+	if writer == nil {
+		return "", ErrCodeEmptyStream.Error("写出流不能为空")
 	}
 
-	uri, err = url.QueryUnescape(uri)
-	if err != nil {
-		return "", ErrCodeUnsupportedProtocols.Error("解析url编码失败: " + err.Error())
-	}
-	u, err := url.Parse(uri)
-	if err != nil {
-		return "", ErrCodeUnsupportedProtocols.ErrorWithRawErrf(err, "不支持的协议类型: %s", err.Error())
-	}
-
-	switch u.Scheme {
-	case "http":
-		fallthrough
-	case "https":
-		return p.httpProtoWrite(uri, w)
-	case "file":
-		if strings.HasPrefix(uri, "file:///") {
-			uri = uri[:7] + uri[8:]
-		}
-		return p.fileProtoWrite(uri, w)
-	default:
-		return "", ErrCodeUnsupportedProtocols.Error("暂不支持该协议类型")
-	}
-
+	return p.writeSupportFile(reader, writer)
 }
 
-// CopyToPath 写到路径
-func (p *Parser) CopyToPath(uri, targetPath string) (FileType, error) {
-	dir := filepath.Dir(targetPath)
-	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
-		if err = os.MkdirAll(dir, 0755); err != nil {
-			return "", ErrCodeMkdir.Errorf("创建目录[%s]失败: %s", dir, err.Error())
+// CopyByURI 拷贝文件通过路径
+func (p *Parser) CopyByURI(srcFilePath, targetFilePath string) (FileType, error) {
+	return p.CopyWithOption(WithEmptySourceOption().SetUri(srcFilePath), WithEmptyTargetOption().SetUri(targetFilePath))
+}
+
+// CopyWithOption 拷贝文件通过选项
+func (p *Parser) CopyWithOption(src *sourceOption, target *targetOption) (FileType, error) {
+	var (
+		t   FileType
+		err error
+	)
+
+	if e := src.parse(func(r io.Reader) error {
+		t, err = target.writeByReader(r, p)
+		return nil
+	}); e != nil {
+		return "", e
+	}
+	return t, err
+}
+
+func (p *Parser) CopyToBytes(srcFile string) (FileType, BytesResult, error) {
+	return p.CopyToBytesWithOption(WithEmptySourceOption().SetUri(srcFile))
+}
+
+func (p *Parser) CopyToBytesWithOption(srcFile *sourceOption) (FileType, BytesResult, error) {
+	var t FileType
+	buf := &bytes.Buffer{}
+	if err := srcFile.parse(func(r io.Reader) error {
+		fileType, err := p.Copy(r, buf)
+		if err != nil {
+			return ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "拷贝文件数据失败: %s", err.Error())
 		}
+		t = fileType
+		return nil
+	}); err != nil {
+		return "", nil, err
 	}
+	return t, buf.Bytes(), nil
+}
 
-	f, err := os.OpenFile(targetPath, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return "", ErrCodeMkFile.Errorf("打开文件[%s]失败: %s", p, err.Error())
-	}
-	defer f.Close()
+type BytesResult []byte
 
-	return p.CopyTo(uri, f)
+func (b BytesResult) Hex() string {
+	return hex.EncodeToString(b)
+}
+
+func (b BytesResult) Base64() string {
+	return base64.StdEncoding.EncodeToString(b)
 }

@@ -93,4 +93,8 @@ const (
 	ErrCodeHttpRequest
 	// ErrCodeResStatusCode http响应状态码非200-299之间
 	ErrCodeResStatusCode
+	// ErrCodeEmptyStream 空流错误
+	ErrCodeEmptyStream
+	// ErrOption 错误的选项
+	ErrOption
 )

@@ -19,23 +19,47 @@ var (
 	chineseSrcFile = "中文测试.pdf"
 )
 
-var testHttpHandFunc http.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
-	filePath := request.RequestURI[1:]
+var (
+	uploadHttpHandFunc http.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
+		file, _, err := request.FormFile("pdfFile")
+		if err != nil {
+			writer.WriteHeader(500)
+			return
+		}
+		defer file.Close()
 
-	if stat, err := os.Stat(filePath); err != nil || stat.IsDir() {
-		writer.WriteHeader(404)
-		return
+		allBytes, err := ioutil.ReadAll(file)
+		if err != nil {
+			writer.WriteHeader(500)
+			return
+		}
+
+		if err = ioutil.WriteFile(targetFile, allBytes, 0655); err != nil {
+			writer.WriteHeader(500)
+			return
+		}
+
+		writer.WriteHeader(200)
 	}
 
-	f, err := os.OpenFile(filePath, os.O_RDONLY, 0655)
-	if err != nil {
-		writer.WriteHeader(404)
-		return
-	}
-	defer f.Close()
+	downloadHttpHandFunc http.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
+		filePath := request.RequestURI[1:]
 
-	_, _ = io.Copy(writer, f)
-}
+		if stat, err := os.Stat(filePath); err != nil || stat.IsDir() {
+			writer.WriteHeader(404)
+			return
+		}
+
+		f, err := os.OpenFile(filePath, os.O_RDONLY, 0655)
+		if err != nil {
+			writer.WriteHeader(404)
+			return
+		}
+		defer f.Close()
+
+		_, _ = io.Copy(writer, f)
+	}
+)
 
 func TestMimeJudgeReg(t *testing.T) {
 
@@ -59,12 +83,12 @@ func TestParser_FileProtoWrite(t *testing.T) {
 
 	parser := New(FileTypePDF)
 
-	_, err := parser.CopyTo("file://"+targetFile, os.Stdout)
-	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
+	_, err := parser.CopyWithOption(WithEmptySourceOption().SetUri("file://"+targetFile), WithEmptyTargetOption().SetWriter(os.Stdout))
+	if !a.True(ErrCodeProtoFileOpen.Equal(err)) {
 		return
 	}
 
-	ft, err := parser.CopyToPath("file://"+srcFile, targetFile)
+	ft, err := parser.CopyByURI("file://"+srcFile, "file://"+targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -101,27 +125,22 @@ func TestParser_HttpProtoWrite(t *testing.T) {
 
 	a := assert.New(t)
 
-	httpServer := httptest.NewServer(testHttpHandFunc)
+	httpServer := httptest.NewServer(downloadHttpHandFunc)
 	defer httpServer.Close()
 
-	httpsServer := httptest.NewTLSServer(testHttpHandFunc)
+	httpsServer := httptest.NewTLSServer(downloadHttpHandFunc)
 	defer httpsServer.Close()
 
 	httpSrcUri := httpServer.URL
 	httpsSrcUri := httpsServer.URL
 
 	parser := New(FileTypePDF)
-	_, err = parser.CopyTo(httpSrcUri+"/"+targetFile, os.Stdout)
+	_, err = parser.CopyWithOption(WithEmptySourceOption().SetUri(httpSrcUri+"/"+targetFile), WithEmptyTargetOption().SetWriter(os.Stdout))
 	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
 		return
 	}
 
-	_, err = parser.CopyTo(httpsSrcUri+"/"+targetFile, os.Stdout)
-	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
-		return
-	}
-
-	ft, err := parser.CopyToPath(httpSrcUri+"/"+srcFile, targetFile)
+	ft, err := parser.CopyByURI(httpSrcUri+"/"+srcFile, "file://"+targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -143,7 +162,7 @@ func TestParser_HttpProtoWrite(t *testing.T) {
 		return
 	}
 
-	ft, err = parser.CopyToPath(httpsSrcUri+"/"+srcFile, targetFile)
+	ft, err = parser.CopyByURI(httpsSrcUri+"/"+srcFile, "file://"+targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -180,7 +199,7 @@ func TestParser_MimeProtoWrite(t *testing.T) {
 	mimeStr := "data:application/pdf;base64," + fb64
 
 	parser := New(FileTypePDF)
-	ft, err := parser.CopyToPath(mimeStr, targetFile)
+	ft, err := parser.CopyByURI(mimeStr, "file://"+targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -211,14 +230,14 @@ func TestChineseFile(t *testing.T) {
 
 	parser := New(FileTypePDF)
 
-	_, err := parser.CopyTo("file://"+targetFile, os.Stdout)
-	if !a.True(ErrCodeProtoFileNoExist.Equal(err)) {
+	_, err := parser.CopyWithOption(WithEmptySourceOption().SetUri("file://"+targetFile), WithEmptyTargetOption().SetWriter(os.Stdout))
+	if !a.True(ErrCodeProtoFileOpen.Equal(err)) {
 		return
 	}
 
-	encUri := url.QueryEscape("file:///" + pdfSrcFile)
+	encUri := url.QueryEscape("file://" + pdfSrcFile)
 
-	ft, err := parser.CopyToPath(encUri, targetFile)
+	ft, err := parser.CopyByURI(encUri, "file://"+targetFile)
 	if !a.NoError(err) {
 		return
 	}
@@ -248,4 +267,41 @@ func TestChineseFile(t *testing.T) {
 
 	a.Equal(srcBytes, targetBytes)
 
+}
+
+func TestCopyToHttp(t *testing.T) {
+	var err error
+	defer os.RemoveAll(targetFile)
+
+	a := assert.New(t)
+
+	httpUploadServer := httptest.NewServer(uploadHttpHandFunc)
+	defer httpUploadServer.Close()
+
+	httpTargetUri := httpUploadServer.URL
+
+	parser := New(FileTypePDF)
+	ft, err := parser.CopyWithOption(WithEmptySourceOption().SetUri("file://"+srcFile),
+		WithHttpTargetOption(&TargetHttpOption{
+			FieldName: "pdfFile",
+		}).SetUri(httpTargetUri+"/"+targetFile))
+	if !a.NoError(err) {
+		return
+	}
+
+	if !a.Equal(FileTypePDF, ft) {
+		return
+	}
+
+	srcBytes, err := ioutil.ReadFile(srcFile)
+	if !a.NoError(err) {
+		return
+	}
+
+	targetBytes, err := ioutil.ReadFile(targetFile)
+	if !a.NoError(err) {
+		return
+	}
+
+	a.Equal(srcBytes, targetBytes)
 }
