@@ -239,6 +239,7 @@ func (s *sourceOption) parse(fn readerCallback) error {
 		filePath := filepath.Join(u.Host, u.Path)
 		if isWindows {
 			filePath = strings.TrimLeft(filePath, "/")
+			filePath = strings.TrimLeft(filePath, "\\")
 		}
 
 		file, err := os.OpenFile(filePath, os.O_RDONLY, 0655)
@@ -397,6 +398,7 @@ func (t *targetOption) writeByReader(r io.Reader, p *Parser) (FileType, error) {
 		fp := filepath.Join(u.Host, u.Path)
 		if isWindows {
 			fp = strings.TrimLeft(fp, "/")
+			fp = strings.TrimLeft(fp, "\\")
 		}
 
 		_ = os.RemoveAll(fp)
