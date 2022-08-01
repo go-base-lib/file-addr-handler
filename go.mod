@@ -1,4 +1,4 @@
-module github.com/go-base-lib/file-addr-handler/tree/main
+module github.com/go-base-lib/file-addr-handler
 
 go 1.18
 
