@@ -1,4 +1,4 @@
-module github.com/byzk-worker/file-addr-handler
+module github.com/go-base-lib/file-addr-handler/tree/main
 
 go 1.18
 
