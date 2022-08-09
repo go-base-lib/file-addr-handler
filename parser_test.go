@@ -288,6 +288,7 @@ func TestCopyToHttp(t *testing.T) {
 	ft, err := parser.CopyWithOption(WithEmptySourceOption().SetUri("file://"+srcFile),
 		WithHttpTargetOption(&TargetHttpOption{
 			FieldName: "pdfFile",
+			Form:      map[string]string{"token": "123456"},
 		}).SetUri(httpTargetUri+"/"+targetFile))
 	if !a.NoError(err) {
 		return

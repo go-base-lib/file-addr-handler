@@ -323,18 +323,32 @@ func (t *targetOption) writeToHttp(uri string, r io.Reader, p *Parser) (FileType
 
 	pipeR, pipeW := io.Pipe()
 	m := multipart.NewWriter(pipeW)
-	if option.Form != nil {
-		for k, v := range option.Form {
-			if err := m.WriteField(k, v); err != nil {
-				return "", ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "写出字段[%s]失败: %s", k, err.Error())
-			}
-		}
-	}
+	//if option.Form != nil {
+	//	for k, v := range option.Form {
+	//		if err := m.WriteField(k, v); err != nil {
+	//			return "", ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "写出字段[%s]失败: %s", k, err.Error())
+	//		}
+	//	}
+	//}
 	ch := make(chan *httpFileWriteResult, 1)
+	//wHeaderErr := make(chan error, 1)
 	go func() {
 		defer pipeW.Close()
 		defer m.Close()
 		defer func() { close(ch) }()
+
+		//defer close(wHeaderErr)
+		//if option.Form != nil {
+		//	for k, v := range option.Form {
+		//		if err := m.WriteField(k, v); err != nil {
+		//			wHeaderErr <- ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "写出字段[%s]失败: %s", k, err.Error())
+		//			return
+		//		}
+		//	}
+		//}
+		//
+		//wHeaderErr <- nil
+
 		f, err := m.CreateFormFile(option.FieldName, option.Filename)
 		if err != nil {
 			ch <- &httpFileWriteResult{err: err}
@@ -353,6 +367,10 @@ func (t *targetOption) writeToHttp(uri string, r io.Reader, p *Parser) (FileType
 	}
 	req.Header = option.Headers
 	req.Header.Add("Content-Type", m.FormDataContentType())
+
+	//if err = <-wHeaderErr; err != nil {
+	//	return "", err
+	//}
 
 	res, err := httpsSupportClient.Do(req)
 	if err != nil {
@@ -407,7 +425,7 @@ func (t *targetOption) writeByReader(r io.Reader, p *Parser) (FileType, error) {
 			if stat.IsDir() {
 				return "", fmt.Errorf("目标地址[%s]不能是一个目录", fp)
 			} else {
-				_ = os.RemoveAll(fp)
+				return "", fmt.Errorf("文件[%s]已存在", fp)
 			}
 		}
 
