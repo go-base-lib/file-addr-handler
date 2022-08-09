@@ -323,31 +323,20 @@ func (t *targetOption) writeToHttp(uri string, r io.Reader, p *Parser) (FileType
 
 	pipeR, pipeW := io.Pipe()
 	m := multipart.NewWriter(pipeW)
-	//if option.Form != nil {
-	//	for k, v := range option.Form {
-	//		if err := m.WriteField(k, v); err != nil {
-	//			return "", ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "写出字段[%s]失败: %s", k, err.Error())
-	//		}
-	//	}
-	//}
 	ch := make(chan *httpFileWriteResult, 1)
-	//wHeaderErr := make(chan error, 1)
 	go func() {
 		defer pipeW.Close()
 		defer m.Close()
 		defer func() { close(ch) }()
 
-		//defer close(wHeaderErr)
-		//if option.Form != nil {
-		//	for k, v := range option.Form {
-		//		if err := m.WriteField(k, v); err != nil {
-		//			wHeaderErr <- ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "写出字段[%s]失败: %s", k, err.Error())
-		//			return
-		//		}
-		//	}
-		//}
-		//
-		//wHeaderErr <- nil
+		if option.Form != nil {
+			for k, v := range option.Form {
+				if err := m.WriteField(k, v); err != nil {
+					ch <- &httpFileWriteResult{err: ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "写出字段[%s]失败: %s", k, err.Error())}
+					return
+				}
+			}
+		}
 
 		f, err := m.CreateFormFile(option.FieldName, option.Filename)
 		if err != nil {
@@ -368,13 +357,9 @@ func (t *targetOption) writeToHttp(uri string, r io.Reader, p *Parser) (FileType
 	req.Header = option.Headers
 	req.Header.Add("Content-Type", m.FormDataContentType())
 
-	//if err = <-wHeaderErr; err != nil {
-	//	return "", err
-	//}
-
 	res, err := httpsSupportClient.Do(req)
 	if err != nil {
-		return "", ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "想目标请求发送数据失败: %s", err.Error())
+		return "", ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "向目标请求发送数据失败: %s", err.Error())
 	}
 	defer res.Body.Close()
 
