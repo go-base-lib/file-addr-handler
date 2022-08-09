@@ -32,7 +32,7 @@ type TargetHttpOption struct {
 	Method    string
 	FieldName string
 	Filename  string
-	Headers   http.Header
+	Headers   map[string]string
 	Form      map[string]string
 }
 
@@ -329,6 +329,13 @@ func (t *targetOption) writeToHttp(uri string, r io.Reader, p *Parser) (FileType
 		defer m.Close()
 		defer func() { close(ch) }()
 
+		f, err := m.CreateFormFile(option.FieldName, option.Filename)
+		if err != nil {
+			ch <- &httpFileWriteResult{err: err}
+			return
+		}
+		fileType, err := p.Copy(r, f)
+
 		if option.Form != nil {
 			for k, v := range option.Form {
 				if err := m.WriteField(k, v); err != nil {
@@ -338,12 +345,6 @@ func (t *targetOption) writeToHttp(uri string, r io.Reader, p *Parser) (FileType
 			}
 		}
 
-		f, err := m.CreateFormFile(option.FieldName, option.Filename)
-		if err != nil {
-			ch <- &httpFileWriteResult{err: err}
-			return
-		}
-		fileType, err := p.Copy(r, f)
 		ch <- &httpFileWriteResult{err: err, t: fileType}
 	}()
 
@@ -351,10 +352,14 @@ func (t *targetOption) writeToHttp(uri string, r io.Reader, p *Parser) (FileType
 	if err != nil {
 		return "", ErrCodeTargetFileWrite.ErrorWithRawErrf(err, "创建请求对象失败: %s", err.Error())
 	}
-	if option.Headers == nil {
-		option.Headers = make(http.Header, 1)
+
+	if len(option.Headers) > 0 {
+		for k := range option.Headers {
+			v := option.Headers[k]
+			req.Header.Add(k, v)
+		}
 	}
-	req.Header = option.Headers
+
 	req.Header.Add("Content-Type", m.FormDataContentType())
 
 	res, err := httpsSupportClient.Do(req)

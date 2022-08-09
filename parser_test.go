@@ -21,6 +21,17 @@ var (
 
 var (
 	uploadHttpHandFunc http.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
+
+		if token := request.FormValue("token"); token != "123456" {
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if token := request.Header.Get("_t"); token != "123456" {
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		// 从表单中获取文件 pdfFile 为 js接口中的fieldName字段
 		file, _, err := request.FormFile("pdfFile")
 		if err != nil {
@@ -288,7 +299,11 @@ func TestCopyToHttp(t *testing.T) {
 	ft, err := parser.CopyWithOption(WithEmptySourceOption().SetUri("file://"+srcFile),
 		WithHttpTargetOption(&TargetHttpOption{
 			FieldName: "pdfFile",
-			Form:      map[string]string{"token": "123456"},
+			Filename:  "test.pdf",
+			Headers: map[string]string{
+				"_t": "123456",
+			},
+			Form: map[string]string{"token": "123456"},
 		}).SetUri(httpTargetUri+"/"+targetFile))
 	if !a.NoError(err) {
 		return
