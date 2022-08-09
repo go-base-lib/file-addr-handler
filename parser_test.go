@@ -21,6 +21,7 @@ var (
 
 var (
 	uploadHttpHandFunc http.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
+		// 从表单中获取文件 pdfFile 为 js接口中的fieldName字段
 		file, _, err := request.FormFile("pdfFile")
 		if err != nil {
 			writer.WriteHeader(500)
@@ -28,17 +29,20 @@ var (
 		}
 		defer file.Close()
 
+		// 获取文件详细内容
 		allBytes, err := ioutil.ReadAll(file)
 		if err != nil {
 			writer.WriteHeader(500)
 			return
 		}
 
+		// 保存文件内容
 		if err = ioutil.WriteFile(targetFile, allBytes, 0655); err != nil {
 			writer.WriteHeader(500)
 			return
 		}
 
+		// 向客户端返回200状态吗，状态码<200或>299即为上传失败
 		writer.WriteHeader(200)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -401,7 +402,15 @@ func (t *targetOption) writeByReader(r io.Reader, p *Parser) (FileType, error) {
 			fp = strings.TrimLeft(fp, "\\")
 		}
 
-		_ = os.RemoveAll(fp)
+		stat, err := os.Stat(fp)
+		if err == nil {
+			if stat.IsDir() {
+				return "", fmt.Errorf("目标地址[%s]不能是一个目录", fp)
+			} else {
+				_ = os.RemoveAll(fp)
+			}
+		}
+
 		_ = os.MkdirAll(filepath.Dir(fp), 0755)
 		file, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE, 0655)
 		if err != nil {
